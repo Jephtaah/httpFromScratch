@@ -1,9 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"bufio"
+	"fmt"
 	"net"
+	"strings"
 )
 
 func main() {
@@ -31,13 +32,25 @@ func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
-	buf := make([]byte, 1024)
 
-	n, err := reader.Read(buf)
+	requestLine, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Println("Error reading:", err)
+		fmt.Println("Error reading request line:", err)
 		return
 	}
 
-	fmt.Printf("Recieved %d bytes: \n%s\n", n, string(buf[:n]))
+	requestLine = strings.TrimRight(requestLine, "\r\n")
+	parts := strings.Split(requestLine, " ")
+
+	if len(parts) != 3 {
+		fmt.Println("Malformed request line:", requestLine)
+		return
+	}
+
+	method := parts[0]
+	path := parts[1]
+	httpVersion := parts[2]
+
+	fmt.Printf("Method: %s\nPath: %s\nVersion: %s\n", method, path, httpVersion)
+
 }
