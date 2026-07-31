@@ -21,14 +21,18 @@ var routes = map[string]Handler{
 }
 
 func main() {
-	listener, err := net.Listen("tcp", ":8080")
+	startServer(":8080")
+}
+
+func startServer(addr string) {
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		fmt.Println("Error starting listener:", err)
 		return
 	}
 	defer listener.Close()
 
-	fmt.Println("Listening on port 8080")
+	fmt.Println("Listening on", addr)
 
 	for {
 		conn, err := listener.Accept()
