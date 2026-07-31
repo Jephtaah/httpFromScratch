@@ -46,88 +46,94 @@ func handleConnection(conn net.Conn) {
 
 	reader := bufio.NewReader(conn)
 
-	requestLine, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("Error reading request line:", err)
-		return
-	}
-
-	requestLine = strings.TrimRight(requestLine, "\r\n")
-	parts := strings.Split(requestLine, " ")
-
-	if len(parts) != 3 {
-		fmt.Println("Malformed request line:", requestLine)
-		return
-	}
-
-	method := parts[0]
-	path := parts[1]
-	httpVersion := parts[2]
-
-	fmt.Printf("Method: %s\nPath: %s\nVersion: %s\n", method, path, httpVersion)
-
-	headers := make(map[string]string)
-
 	for {
-		line, err := reader.ReadString('\n')
+		requestLine, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("Error reading header line:", err)
+			fmt.Println("Error reading request line:", err)
 			return
 		}
 
-		line = strings.TrimRight(line, "\r\n")
+		requestLine = strings.TrimRight(requestLine, "\r\n")
+		parts := strings.Split(requestLine, " ")
 
-		if line == "" {
-			break
+		if len(parts) != 3 {
+			fmt.Println("Malformed request line:", requestLine)
+			return
 		}
 
-		headerParts := strings.SplitN(line, ":", 2)
-		if len(headerParts) != 2 {
-			fmt.Println("Malformed header line:", line)
-			continue
+		method := parts[0]
+		path := parts[1]
+
+		headers := make(map[string]string)
+
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				fmt.Println("Error reading header line:", err)
+				return
+			}
+
+			line = strings.TrimRight(line, "\r\n")
+
+			if line == "" {
+				break
+			}
+
+			headerParts := strings.SplitN(line, ":", 2)
+			if len(headerParts) != 2 {
+				fmt.Println("Malformed header line:", line)
+				continue
+			}
+
+			key := strings.TrimSpace(headerParts[0])
+			value := strings.TrimSpace(headerParts[1])
+			headers[key] = value
 		}
 
-		key := strings.TrimSpace(headerParts[0])
-		value := strings.TrimSpace(headerParts[1])
-		headers[key] = value
-	}
+		var body []byte
 
-	fmt.Println("Headers:", headers)
+		if contentLengthStr, ok := headers["Content-Length"]; ok {
+			contentLength, err := strconv.Atoi(contentLengthStr)
+			if err == nil {
+				body = make([]byte, contentLength)
+				io.ReadFull(reader, body)
+			}
+		}
 
-	var body []byte
+		routeKey := method + " " + path
+		handler, found := routes[routeKey]
 
-	if contentLengthStr, ok := headers["Content-Length"]; ok {
-		contentLength, err := strconv.Atoi(contentLengthStr)
-		if err == nil {
-			body = make([]byte, contentLength)
-			io.ReadFull(reader, body)
+		var statusCode int
+		var responseBody string
+
+		if found {
+			statusCode, responseBody = handler(method, path, headers, body)
+		} else {
+			statusCode, responseBody = 404, "Not Found"
+		}
+
+		statusText := map[int]string{
+			200: "OK",
+			404: "Not Found",
+		}[statusCode]
+
+		connectionHeader := "keep-alive"
+		if strings.ToLower(headers["Connection"]) == "close" {
+			connectionHeader = "close"
+		}
+
+		response := fmt.Sprintf(
+			"HTTP/1.1 %d %s\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s",
+			statusCode,
+			statusText,
+			len(responseBody),
+			responseBody,
+		)
+
+		conn.Write([]byte(response))
+
+		if connectionHeader == "close" {
+			return
 		}
 	}
-
-	routeKey := method + " " + path
-	handler, found := routes[routeKey]
-
-	var statusCode int
-	var responseBody string
-
-	if found {
-		statusCode, responseBody = handler(method, path, headers, body)
-	} else {
-		statusCode, responseBody = 404, "Not Found"
-	}
-
-	statusText := map[int]string{
-		200: "OK",
-		404: "Not Found",
-	}[statusCode]
-
-	response := fmt.Sprintf(
-		"HTTP/1.1 %d %s\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s",
-		statusCode,
-		statusText,
-		len(responseBody),
-		responseBody,
-	)
-
-	conn.Write([]byte(response))
 }
