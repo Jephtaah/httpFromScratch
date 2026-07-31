@@ -53,4 +53,31 @@ func handleConnection(conn net.Conn) {
 
 	fmt.Printf("Method: %s\nPath: %s\nVersion: %s\n", method, path, httpVersion)
 
+	hearders := make(map[string]string)
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Error reading header line:", err)
+			return
+		}
+
+		line = strings.TrimRight(line, "\r\n")
+
+		if line == "" {
+			break
+		}
+
+		headerParts := strings.SplitN(line, ":", 2)
+		if len(headerParts) != 2 {
+			fmt.Println("Malformed header line:", line)
+			continue
+		}
+
+		key := strings.TrimSpace(headerParts[0])
+		value := strings.TrimSpace(headerParts[1])
+		hearders[key] = value
+	}
+
+	fmt.Println("Headers:", hearders)
 }
