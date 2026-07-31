@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -53,7 +55,7 @@ func handleConnection(conn net.Conn) {
 
 	fmt.Printf("Method: %s\nPath: %s\nVersion: %s\n", method, path, httpVersion)
 
-	hearders := make(map[string]string)
+	headers := make(map[string]string)
 
 	for {
 		line, err := reader.ReadString('\n')
@@ -76,8 +78,27 @@ func handleConnection(conn net.Conn) {
 
 		key := strings.TrimSpace(headerParts[0])
 		value := strings.TrimSpace(headerParts[1])
-		hearders[key] = value
+		headers[key] = value
 	}
 
-	fmt.Println("Headers:", hearders)
+	fmt.Println("Headers:", headers)
+
+	var body []byte
+
+	if contentLengthStr, ok := headers["Content-Length"]; ok {
+		contentLength, err := strconv.Atoi(contentLengthStr)
+		if err != nil {
+			fmt.Println("Invalid Content-Length:", contentLengthStr)
+			return
+		}
+
+		body = make([]byte, contentLength)
+		_, err = io.ReadFull(reader, body)
+		if err != nil {
+			fmt.Println("Error reading body:", err)
+			return
+		}
+	}
+
+	fmt.Printf("Body: %s\n", string(body))
 }
