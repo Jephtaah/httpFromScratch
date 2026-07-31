@@ -101,4 +101,13 @@ func handleConnection(conn net.Conn) {
 	}
 
 	fmt.Printf("Body: %s\n", string(body))
+
+	responseBody := "Hello, World!"
+	response := fmt.Sprintf(
+		"HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s",
+		len(responseBody),
+		responseBody,
+	)
+
+	conn.Write([]byte(response))
 }
