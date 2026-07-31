@@ -37,7 +37,7 @@ func main() {
 			continue
 		}
 
-		handleConnection(conn)
+		go handleConnection(conn)
 	}
 }
 
