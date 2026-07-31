@@ -9,6 +9,17 @@ import (
 	"strings"
 )
 
+type Handler func(method, path string, headers map[string]string, body []byte) (int, string)
+
+var routes = map[string]Handler{
+	"GET /health": func(method, path string, headers map[string]string, body []byte) (int, string) {
+		return 200, "OK"
+	},
+	"POST /echo": func(method, path string, headers map[string]string, body []byte) (int, string) {
+		return 200, string(body)
+	},
+}
+
 func main() {
 	listener, err := net.Listen("tcp", ":8080")
 	if err != nil {
@@ -87,24 +98,33 @@ func handleConnection(conn net.Conn) {
 
 	if contentLengthStr, ok := headers["Content-Length"]; ok {
 		contentLength, err := strconv.Atoi(contentLengthStr)
-		if err != nil {
-			fmt.Println("Invalid Content-Length:", contentLengthStr)
-			return
-		}
-
-		body = make([]byte, contentLength)
-		_, err = io.ReadFull(reader, body)
-		if err != nil {
-			fmt.Println("Error reading body:", err)
-			return
+		if err == nil {
+			body = make([]byte, contentLength)
+			io.ReadFull(reader, body)
 		}
 	}
 
-	fmt.Printf("Body: %s\n", string(body))
+	routeKey := method + " " + path
+	handler, found := routes[routeKey]
 
-	responseBody := "Hello, World!"
+	var statusCode int
+	var responseBody string
+
+	if found {
+		statusCode, responseBody = handler(method, path, headers, body)
+	} else {
+		statusCode, responseBody = 404, "Not Found"
+	}
+
+	statusText := map[int]string{
+		200: "OK",
+		404: "Not Found",
+	}[statusCode]
+
 	response := fmt.Sprintf(
-		"HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s",
+		"HTTP/1.1 %d %s\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s",
+		statusCode,
+		statusText,
 		len(responseBody),
 		responseBody,
 	)
